@@ -1,36 +1,30 @@
-"""Smoke tests for check_host.sh."""
-import subprocess
-from pathlib import Path
+name: CI
 
-ROOT = Path(__file__).resolve().parent.parent
-SCRIPT = ROOT / "check_host.sh"
+on:
+  push:
+    branches: [main]
+  pull_request:
 
+jobs:
+  shellcheck:
+    name: Bash lint (shellcheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run shellcheck
+        run: shellcheck --severity=style $(git ls-files '*.sh')
 
-def run_script(*args: str) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        ["bash", str(SCRIPT), *args],
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-
-
-def test_script_exists():
-    assert SCRIPT.exists(), "check_host.sh not found in repo root"
-
-
-def test_no_args_shows_usage():
-    result = run_script()
-    assert result.returncode == 1
-    assert "Usage" in result.stdout
-
-
-def test_bad_port_rejected():
-    result = run_script("localhost", "not-a-port")
-    assert result.returncode == 1
-    assert "is not a number" in result.stdout
-
-
-def test_localhost_is_available():
-    result = run_script("localhost")
-    assert result.returncode == 0
+  python-tests:
+    name: Python lint + tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tools
+        run: python -m pip install --upgrade pip pytest flake8
+      - name: flake8
+        run: flake8 . --max-line-length=100 --exclude=.git,__pycache__,.venv
+      - name: pytest
+        run: pytest -v
